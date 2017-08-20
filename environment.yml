@@ -1,0 +1,12 @@
+name: gat
+channels:
+  - conda-forge
+  - ioam
+dependencies:
+  - python=3.6
+  - tweepy
+  - bokeh
+  - pandas
+  - matplotlib
+  - basemap
+  - pyqt
