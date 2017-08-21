@@ -1,5 +1,7 @@
 # Great American Tweets #
 
+Check out the live map @ [greatamericantweets.com](http://greatamericantweets.com)
+
 This Bokeh application is set up to track and plot tweets onto an interactive map
 during the Great American Eclipse.
 
