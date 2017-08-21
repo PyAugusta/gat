@@ -13,7 +13,7 @@ class Clock(threading.Thread):
 
     def __init__(self):
         self._lock = threading.Lock()
-        self._time = datetime.now()
+        self._time = datetime.utcnow()
         self._stop_event = threading.Event()
         threading.Thread.__init__(self)
         
@@ -21,7 +21,7 @@ class Clock(threading.Thread):
         while True:
             if self._stop_event.is_set():
                 break
-            self._time = datetime.now()
+            self._time = datetime.utcnow()
             sleep(1)
             
     def time(self):
@@ -58,6 +58,7 @@ data_handler = OnDataHandler()
 class Listener(StreamListener, threading.Thread):
 
     def __init__(self, stop_at, box):
+        self._stop_event = threading.Event()
         self.stop_at = stop_at
         self.box = [float(c) for c in box]
         self.tweets = []
@@ -69,7 +70,9 @@ class Listener(StreamListener, threading.Thread):
         return parse(self.stop_at)
         
     def on_data(self, data):
-        if clock.time() >= self.stop_time:
+        time = clock.time()
+        if time >= self.stop_time:
+            print('time up, stopping listener')
             raise StopTime
         all_data = json.loads(data)
         try:
@@ -99,16 +102,22 @@ class Listener(StreamListener, threading.Thread):
                 url = all_data['entities']['urls'][0]['url']
             except (KeyError, IndexError):
                 url = None
-            target_data.update({'url': url, 'text': text, 'display_img': display_img, 'media': media, 'coords': coords, 'hashtags': hashtags})
+            target_data.update({'url': url, 'text': text, 'display_img': display_img, 'media': media, 'coords': coords, 'hashtags': hashtags, 'time': time})
             data_handler.process_data(target_data)
             #self.tweets.append(target_data)
             self.tweets.append(all_data)
-        
+    
+    def stop(self):
+        self._stop_event.set()
+
+    def stopped(self):
+        return self._stop_event.is_set()
+
     def run(self):
         try:
             self.stream.filter(locations=self.box)
         except StopTime:
-            print('time up')
+            self.stop()
             return
             
         
@@ -116,7 +125,7 @@ if __name__ == '__main__':
     try:
         from datetime import timedelta
         seconds = 20 * 60
-        stop_time = datetime.strftime(datetime.now() + timedelta(seconds=seconds), '%Y%m%d %H%M')
+        stop_time = datetime.strftime(datetime.utcnow() + timedelta(seconds=seconds), '%Y%m%d %H%M')
         print("will stop around {}".format(stop_time))
         ny = [-74,40,-73,41]
         sf = [-122.75,36.8,-121.75,37.8]

@@ -1,5 +1,5 @@
 import threading
-from datetime import datetime, timedelta
+from datetime import datetime
 from time import sleep
 from bokeh.models import (
     ColumnDataSource,
@@ -16,59 +16,65 @@ from bokeh.plotting import (
     curdoc
 )
 from bokeh.layouts import row
-from gat_config import route
+from gat_config import route, make_test_route, get_nysf_route
 import gat_stream
 
+#route = make_test_route()
+route = get_nysf_route()
 
-def get_timerange(plus_seconds, start=datetime.now()):
-    n = start + timedelta(seconds=5)
-    e = n + timedelta(seconds=plus_seconds)
-    return n, e
-
-nypoi = [-74,40,-73,41]
-_nystart, _nyend = get_timerange(120)
-nystart = datetime.strftime(_nystart, '%Y%m%d %H%M')
-nyend = datetime.strftime(_nyend, '%Y%m%d %H%M')
-
-sfpoi = [-122.75,36.8,-121.75,37.8]
-_sfstart, _sfend = get_timerange(120, start=_nyend)
-sfstart = datetime.strftime(_sfstart, '%Y%m%d %H%M')
-sfend = datetime.strftime(_sfend, '%Y%m%d %H%M')
-
-test_route = [{'start': nystart, 'stop': nyend, 'box': nypoi},
-              {'start': sfstart, 'stop': sfend, 'box': sfpoi}]
-print(test_route)
-
-listeners = {r['start']: gat_stream.Listener(r['stop'], r['box']) for r in test_route}
-active_listeners = []
+print(route)
 
 class Listeners(threading.Thread):
 
-  def __init__(self):
-    self.listeners = {r['start']: gat_stream.Listener(r['stop'], r['box']) for r in test_route}
-    self.active_listeners = []
-    self._stop_event = threading.Event()
-    threading.Thread.__init__(self)
+    def __init__(self):
+        self.listeners = {r['start']: gat_stream.Listener(r['stop'], r['box']) for r in route}
+        self.first_started = False
+        self.started_listeners = []
+        self.killed_listeners = []
+        self._stop_event = threading.Event()
+        threading.Thread.__init__(self)
 
-  def get(self):
-    time = datetime.strftime(datetime.now(), '%Y%m%d %H%M')
-    return listeners.get(time)
-
-  def run(self):
-    while True:
-        if self._stop_event.is_set():
-            break
-        listener = self.get()
-        if listener:
-            try:
-                listener.start()
-                self.active_listeners.append(listener)
-            except RuntimeError: #thread already started
-                pass
-        sleep(1)
+    def get(self):
+        time = datetime.strftime(datetime.utcnow(), '%Y%m%d %H%M')
+        return self.listeners.get(time)
 
     def stop(self):
+        gat_stream.data_handler.save_data()
         self._stop_event.set()
+
+    def show_count(self):
+        print(
+            'started: {}, stopped: {}'.format(
+                len(self.started_listeners),
+                len(self.killed_listeners)
+            )
+        )
+
+    def run(self):
+        while True:
+            if self._stop_event.is_set():
+                break
+            listener = self.get()
+            if listener:
+                try:
+                    listener.start()
+                    self.started_listeners.append(listener)
+                    if len(self.started_listeners) == 1:
+                        print('started first listener')
+                        self.first_started = True
+                    else:
+                        print('started new listener')
+                    self.show_count()
+                except RuntimeError: #thread already started
+                    pass
+            if self.first_started:
+                for l in self.started_listeners:
+                    if l.stopped() and l not in self.killed_listeners:
+                        self.killed_listeners.append(l)
+                        self.show_count()
+                if len(self.started_listeners) == len(self.killed_listeners):
+                    self.stop()
+            sleep(0.5)
 
     def stopped(self):
         return self._stop_event.is_set()
@@ -78,14 +84,23 @@ class Listeners(threading.Thread):
 gat_listeners = Listeners()
 gat_listeners.start()
 
+def kill_threads():
+    gat_listeners.stop()
+    for l in gat_listeners.started_listeners:
+        if not l.stopped():
+            l.stop()
+        l.join()
+    gat_listeners.join()
+    gat_stream.stop_clock()
+    print('done...with {} threads still active'.format(threading.active_count()))    
 
 data = ColumnDataSource({col: [] for col in gat_stream.data_handler.columns})
 tile_options = {
     'url': 'https://cartodb-basemaps-b.global.ssl.fastly.net/dark_all/{z}/{x}/{y}.png'
 }
 tile_source = WMTSTileSource(**tile_options)
-x_range = Range1d(start=-12500000, end=-7700000, bounds=None)
-y_range = Range1d(start=3000000, end=5000000, bounds=None)
+x_range = Range1d(start=-14000000, end=-8000000, bounds=None)
+y_range = Range1d(start=1800000, end=5800000, bounds=None)
 
 hover = HoverTool(tooltips="""
 <div style="max-width: 300px;">
@@ -117,3 +132,14 @@ def update_data():
 curdoc().add_root(row(gat_plot, width=1600))
 curdoc().title = "Great American Tweets"
 curdoc().add_periodic_callback(update_data, 1000)
+
+def tkill():
+    while True:
+        if gat_listeners.stopped():
+            print('all listeners stopped...killing loose threads')
+            kill_threads()
+            break
+
+t = threading.Thread(target=tkill)
+t.start()
+

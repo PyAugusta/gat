@@ -4,6 +4,7 @@ channels:
   - ioam
 dependencies:
   - python=3.6
+  - dateutil
   - tweepy
   - bokeh
   - pandas
