@@ -20,7 +20,7 @@ from gat_config import route, make_test_route, get_nysf_route
 import gat_stream
 
 #route = make_test_route()
-route = get_nysf_route()
+#route = get_nysf_route()
 
 print(route)
 
