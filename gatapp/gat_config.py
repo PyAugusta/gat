@@ -45,7 +45,7 @@ def get_nysf_route():
         return n, e
 
     nypoi = [-74,40,-73,41]
-    _nystart, _nyend = get_timerange(60)
+    _nystart, _nyend = get_timerange(120)
     nystart = datetime.strftime(_nystart, '%Y%m%d %H%M')
     nyend = datetime.strftime(_nyend, '%Y%m%d %H%M')
 

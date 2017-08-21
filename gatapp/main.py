@@ -104,7 +104,9 @@ y_range = Range1d(start=1800000, end=5800000, bounds=None)
 
 hover = HoverTool(tooltips="""
 <div style="max-width: 300px;">
-  <img style="max-height: 100%; max-width: 100%" src="@display_img"></img>
+  <a href="@url" target="_blank">
+    <img style="max-height: 100%; max-width: 100%" src="@display_img"></img>
+  </a>
 </div>
 """
 )

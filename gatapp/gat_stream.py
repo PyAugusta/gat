@@ -1,5 +1,4 @@
 import threading
-from math import radians
 from datetime import datetime
 from dateutil.parser import parse
 from time import sleep
@@ -102,7 +101,7 @@ class Listener(StreamListener, threading.Thread):
                 url = all_data['entities']['urls'][0]['url']
             except (KeyError, IndexError):
                 url = None
-            target_data.update({'url': url, 'text': text, 'display_img': display_img, 'media': media, 'coords': coords, 'hashtags': hashtags, 'time': time})
+            target_data.update({'url': url, 'text': text, 'display_img': display_img, 'media': media, 'coords': coords, 'hashtags': hashtags, 'time': datetime.strftime(time, '%Y%m%d %H%M%S')})
             data_handler.process_data(target_data)
             #self.tweets.append(target_data)
             self.tweets.append(all_data)
